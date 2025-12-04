@@ -2,12 +2,9 @@ package simulationengine
 
 import (
 	"fmt"
-	"math"
-	"math/rand/v2"
 	"sort"
 
 	"github.com/fogleman/delaunay"
-	"github.com/google/uuid"
 	"github.com/m/internal/simulation/entities"
 )
 
@@ -26,9 +23,9 @@ const (
 type Algorithm string
 
 const (
-	AlgoRGG       Algorithm = "rgg"
-	AlgoKNN       Algorithm = "knn"
-	AlgoDelaunay  Algorithm = "delaunay"
+	AlgoRGG      Algorithm = "rgg"
+	AlgoKNN      Algorithm = "knn"
+	AlgoDelaunay Algorithm = "delaunay"
 )
 
 type MapGeneratorConfig struct {
@@ -68,9 +65,7 @@ func (cfg *MapGeneratorConfig) Generate() *entities.MapGraph {
 
 func RandomGeometricGraph(N int, heightBound int, widthBound int, mode RadiusMode) *entities.MapGraph {
 	nodes := generateNodes(N, heightBound, widthBound)
-
 	area := float64(heightBound) * float64(widthBound)
-
 	r := OptimalRadius(N, area)
 	if mode == Sparse {
 		r *= 0.6
@@ -80,24 +75,29 @@ func RandomGeometricGraph(N int, heightBound int, widthBound int, mode RadiusMod
 	}
 
 	ids := collectIDs(nodes)
+	edges := make(map[string]*entities.MapEdge)
 
 	for i := 0; i < len(ids); i++ {
 		for j := i + 1; j < len(ids); j++ {
 			a := nodes[ids[i]]
 			b := nodes[ids[j]]
-			if distance(a.Position, b.Position) <= r {
-				a.Connections = append(a.Connections, b.ID)
-				b.Connections = append(b.Connections, a.ID)
+			dist := distance(a.Position, b.Position)
+			if dist <= r {
+				a.Connections[b.ID] = true
+				b.Connections[a.ID] = true
+				edge := createEdge(a.ID, b.ID, dist)
+				edges[edge.ID] = edge
 			}
 		}
 	}
 
-	return &entities.MapGraph{Nodes: nodes}
+	return &entities.MapGraph{Nodes: nodes, Edges: edges}
 }
 
 func KNNGraph(N int, heightBound int, widthBound int, K int) *entities.MapGraph {
 	nodes := generateNodes(N, heightBound, widthBound)
 	ids := collectIDs(nodes)
+	edges := make(map[string]*entities.MapEdge)
 
 	for _, id := range ids {
 		cur := nodes[id]
@@ -130,17 +130,19 @@ func KNNGraph(N int, heightBound int, widthBound int, K int) *entities.MapGraph 
 
 		for i := 0; i < limit; i++ {
 			other := nodes[distances[i].id]
-			cur.Connections = append(cur.Connections, other.ID)
-			other.Connections = append(other.Connections, cur.ID)
+			cur.Connections[other.ID] = true
+			other.Connections[cur.ID] = true
+			edgeDist := distances[i].dist
+			edge := createEdge(cur.ID, other.ID, edgeDist)
+			edges[edge.ID] = edge
 		}
 	}
 
-	return &entities.MapGraph{Nodes: nodes}
+	return &entities.MapGraph{Nodes: nodes, Edges: edges}
 }
 
 func DelaunayGraph(N int, heightBound int, widthBound int) *entities.MapGraph {
 	nodes := generateNodes(N, heightBound, widthBound)
-
 	points := make([]delaunay.Point, 0, N)
 	indexMap := make(map[int]string)
 
@@ -152,77 +154,29 @@ func DelaunayGraph(N int, heightBound int, widthBound int) *entities.MapGraph {
 	}
 
 	tri, _ := delaunay.Triangulate(points)
+	edges := make(map[string]*entities.MapEdge)
+	edgeSet := make(map[string]bool)
 
-	edges := make(map[string]bool)
 	for i := 0; i < len(tri.Triangles); i += 3 {
-		
 		a := tri.Triangles[i]
 		b := tri.Triangles[i+1]
 		c := tri.Triangles[i+2]
-		addEdge(edges, a, b)
-		addEdge(edges, b, c)
-		addEdge(edges, c, a)
+		addEdge(edgeSet, a, b)
+		addEdge(edgeSet, b, c)
+		addEdge(edgeSet, c, a)
 	}
 
-	for edge := range edges {
-		
+	for edge := range edgeSet {
 		var a, b int
 		fmt.Sscanf(edge, "%d-%d", &a, &b)
-
 		na := nodes[indexMap[a]]
 		nb := nodes[indexMap[b]]
-
-		na.Connections = append(na.Connections, nb.ID)
-		nb.Connections = append(nb.Connections, na.ID)
+		na.Connections[nb.ID] = true
+		nb.Connections[na.ID] = true
+		edgeDist := distance(na.Position, nb.Position)
+		mapEdge := createEdge(na.ID, nb.ID, edgeDist)
+		edges[mapEdge.ID] = mapEdge
 	}
 
-	return &entities.MapGraph{Nodes: nodes}
+	return &entities.MapGraph{Nodes: nodes, Edges: edges}
 }
-
-func generateNodes(N int, heightBound int, widthBound int) map[string]*entities.MapNode {
-	nodes := make(map[string]*entities.MapNode)
-	for i := 0; i < N; i++ {
-		x, y := UniformRandomDistributionSampler(heightBound, widthBound)
-		id := uuid.New().String()
-		nodes[id] = &entities.MapNode{
-			ID:          id,
-			Position:    entities.Vector2D{X: float64(x), Y: float64(y)},
-			Type:        entities.NodeTypeIntersection,
-			Connections: []string{},
-		}
-	}
-	return nodes
-}
-
-func collectIDs(nodes map[string]*entities.MapNode) []string {
-	ids := make([]string, 0, len(nodes))
-	for id := range nodes {
-		ids = append(ids, id)
-	}
-	return ids
-}
-
-func OptimalRadius(N int, area float64) float64 {
-	d := math.Log(float64(N))
-	return math.Sqrt((d * area) / (math.Pi * float64(N)))
-}
-
-func distance(a, b entities.Vector2D) float64 {
-	dx := a.X - b.X
-	dy := a.Y - b.Y
-	return math.Sqrt(dx*dx + dy*dy)
-}
-func UniformRandomDistributionSampler(heightBound int, widthBound int) (int, int) {
-	x := rand.IntN(widthBound)
-	y := rand.IntN(heightBound)
-	return x, y
-}
-
-func addEdge(edges map[string]bool, a, b int) {
-	if a > b {
-		a, b = b, a
-	}
-	key := fmt.Sprintf("%d-%d", a, b)
-	edges[key] = true
-}
-
