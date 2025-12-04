@@ -40,7 +40,7 @@ type MapGeneratorConfig struct {
 	RadiusMode RadiusMode
 }
 
-func NewMapGenerator(height int, width int, seed int64, algorithm Algorithm, n int) *MapGeneratorConfig {
+func NewMapGenerator(height int, width int, seed int64, algorithm Algorithm, n, k int) *MapGeneratorConfig {
 	return &MapGeneratorConfig{
 		Bounds: MapBounds{
 			Height: height,
@@ -49,7 +49,7 @@ func NewMapGenerator(height int, width int, seed int64, algorithm Algorithm, n i
 		Seed:      seed,
 		Algorithm: algorithm,
 		N:         n,
-		K:         6,
+		K:         k,
 	}
 }
 
