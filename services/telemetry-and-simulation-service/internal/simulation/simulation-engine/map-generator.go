@@ -20,8 +20,6 @@ const (
 	Connected
 )
 
-type Algorithm string
-
 const (
 	AlgoRGG      Algorithm = "rgg"
 	AlgoKNN      Algorithm = "knn"
