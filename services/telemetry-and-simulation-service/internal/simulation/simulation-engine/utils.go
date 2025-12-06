@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"math"
 	"math/rand/v2"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/m/internal/simulation/entities"
@@ -13,7 +12,7 @@ import (
 func generateNodes(N int, heightBound int, widthBound int) map[string]*entities.MapNode {
 	nodes := make(map[string]*entities.MapNode)
 	for i := 0; i < N; i++ {
-		x, y := UniformRandomDistributionSampler(heightBound, widthBound)
+		x, y := uniformRandomDistributionSampler(heightBound, widthBound)
 		id := uuid.New().String()
 		nodes[id] = &entities.MapNode{
 			ID:          id,
@@ -33,18 +32,18 @@ func collectIDs(nodes map[string]*entities.MapNode) []string {
 	return ids
 }
 
-func OptimalRadius(N int, area float64) float64 {
-	d := math.Log(float64(N))
-	return math.Sqrt((d * area) / (math.Pi * float64(N)))
-}
-
 func distance(a, b entities.Vector2D) float64 {
 	dx := a.X - b.X
 	dy := a.Y - b.Y
 	return math.Sqrt(dx*dx + dy*dy)
 }
 
-func UniformRandomDistributionSampler(heightBound int, widthBound int) (int, int) {
+func optimalRadius(N int, area float64) float64 {
+	d := math.Log(float64(N))
+	return math.Sqrt((d * area) / (math.Pi * float64(N)))
+}
+
+func uniformRandomDistributionSampler(heightBound int, widthBound int) (int, int) {
 	x := rand.IntN(widthBound)
 	y := rand.IntN(heightBound)
 	return x, y
@@ -58,37 +57,13 @@ func addEdge(edges map[string]bool, a, b int) {
 	edges[key] = true
 }
 
-func createEdge(fromID, toID string, distance float64) *entities.MapEdge {
-	id := fmt.Sprintf("%s-%s", fromID, toID)
-
-	var baseSpeedLimit float64
-	if distance < 100 {
-		baseSpeedLimit = 13.4
-	} else if distance < 300 {
-		baseSpeedLimit = 22.2
-	} else {
-		baseSpeedLimit = 33.3
+func findEdge(g *entities.MapGraph, from, to string) *entities.MapEdge {
+	for _, edge := range g.Edges {
+		if (edge.From == from && edge.To == to) || (edge.Bidirectional && edge.From == to && edge.To == from) {
+			return edge
+		}
 	}
-
-	weatherMultiplier := 1.0
-
-	isBidirectional := rand.Float64() < rand.Float64()
-
-	return &entities.MapEdge{
-		ID:             id,
-		From:           fromID,
-		To:             toID,
-		Length:         distance,
-		BaseSpeedLimit: baseSpeedLimit,
-		SurfaceQuality: 0.95 + rand.Float64()*0.05,
-		Bidirectional:  isBidirectional,
-		Conditions: &entities.RoadConditions{
-			Congestion:          0.0,
-			WeatherMultiplier:   weatherMultiplier,
-			EffectiveSpeedLimit: baseSpeedLimit * weatherMultiplier,
-			LastUpdated:         time.Now(),
-		},
-	}
+	return nil
 }
 
 func BuildEdgesFromConnections(mg *entities.MapGraph) error {
@@ -139,7 +114,6 @@ func BuildEdgesFromConnections(mg *entities.MapGraph) error {
 					Congestion:          0.0,
 					WeatherMultiplier:   1.0,
 					EffectiveSpeedLimit: baseSpeedLimit,
-					LastUpdated:         time.Now(),
 				},
 			}
 

@@ -37,7 +37,6 @@ type DecisionState struct {
 }
 
 type TelemetryEmitter interface {
-	EmitPosition(vehicleID string, position PositionRecord) error
-	EmitEvent(vehicleID string, event VehicleEvent) error
-	EmitBatch(batch TelemetryBatch) error
+	EmitPosition(event BasicVehiclePosEvent) error
+	EmitEvent(event VehicleEvent) error
 }

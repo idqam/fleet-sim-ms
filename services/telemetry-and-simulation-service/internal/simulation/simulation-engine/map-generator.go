@@ -57,14 +57,14 @@ func (cfg *MapGeneratorConfig) Generate() *entities.MapGraph {
 	case AlgoDelaunay:
 		return DelaunayGraph(cfg.N, cfg.Bounds.Height, cfg.Bounds.Width)
 	default:
-		return &entities.MapGraph{Nodes: map[string]*entities.MapNode{}}
+		return &entities.MapGraph{Nodes: map[string]*entities.MapNode{}, Edges: map[string]*entities.MapEdge{}}
 	}
 }
 
 func RandomGeometricGraph(N int, heightBound int, widthBound int, mode RadiusMode) *entities.MapGraph {
 	nodes := generateNodes(N, heightBound, widthBound)
 	area := float64(heightBound) * float64(widthBound)
-	r := OptimalRadius(N, area)
+	r := optimalRadius(N, area)
 	if mode == Sparse {
 		r *= 0.6
 	}
@@ -83,8 +83,15 @@ func RandomGeometricGraph(N int, heightBound int, widthBound int, mode RadiusMod
 			if dist <= r {
 				a.Connections[b.ID] = true
 				b.Connections[a.ID] = true
-				edge := createEdge(a.ID, b.ID, dist)
-				edges[edge.ID] = edge
+				id := a.ID + "->" + b.ID
+				edge := &entities.MapEdge{
+					ID:            id,
+					From:          a.ID,
+					To:            b.ID,
+					Length:        dist,
+					Bidirectional: true,
+				}
+				edges[id] = edge
 			}
 		}
 	}
@@ -130,9 +137,15 @@ func KNNGraph(N int, heightBound int, widthBound int, K int) *entities.MapGraph 
 			other := nodes[distances[i].id]
 			cur.Connections[other.ID] = true
 			other.Connections[cur.ID] = true
-			edgeDist := distances[i].dist
-			edge := createEdge(cur.ID, other.ID, edgeDist)
-			edges[edge.ID] = edge
+			id := cur.ID + "->" + other.ID
+			edge := &entities.MapEdge{
+				ID:            id,
+				From:          cur.ID,
+				To:            other.ID,
+				Length:        distances[i].dist,
+				Bidirectional: true,
+			}
+			edges[id] = edge
 		}
 	}
 
@@ -169,11 +182,18 @@ func DelaunayGraph(N int, heightBound int, widthBound int) *entities.MapGraph {
 		fmt.Sscanf(edge, "%d-%d", &a, &b)
 		na := nodes[indexMap[a]]
 		nb := nodes[indexMap[b]]
+		dist := distance(na.Position, nb.Position)
 		na.Connections[nb.ID] = true
 		nb.Connections[na.ID] = true
-		edgeDist := distance(na.Position, nb.Position)
-		mapEdge := createEdge(na.ID, nb.ID, edgeDist)
-		edges[mapEdge.ID] = mapEdge
+		id := na.ID + "->" + nb.ID
+		mapEdge := &entities.MapEdge{
+			ID:            id,
+			From:          na.ID,
+			To:            nb.ID,
+			Length:        dist,
+			Bidirectional: true,
+		}
+		edges[id] = mapEdge
 	}
 
 	return &entities.MapGraph{Nodes: nodes, Edges: edges}

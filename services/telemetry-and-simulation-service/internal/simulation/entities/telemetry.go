@@ -4,21 +4,12 @@ import (
 	"time"
 )
 
-type TelemetryBatch struct {
-	VehicleID string           `json:"vehicle_id"`
-	Positions []PositionRecord `json:"positions"`
-	Events    []VehicleEvent   `json:"events"`
-	StartTime time.Time        `json:"start_time"`
-	EndTime   time.Time        `json:"end_time"`
-}
-
-type PositionRecord struct {
-	Timestamp time.Time `json:"timestamp"`
-	Lat       float64   `json:"lat"`
-	Lon       float64   `json:"lon"`
-	Speed     float64   `json:"speed"`
-	Heading   float64   `json:"heading"`
-	EdgeID    string    `json:"edge_id"`
+type BasicVehiclePosEvent struct {
+	VehicleID  string    `json:"vehicle_id"`
+	EdgeID     string    `json:"edge_id"`
+	FromNodeID string    `json:"from_node_id"`
+	Progress   float64   `json:"progress"`
+	Timestamp  time.Time `json:"timestamp"`
 }
 
 type VehicleEvent struct {
@@ -30,8 +21,8 @@ type VehicleEvent struct {
 }
 
 type TelemetryMetrics struct {
-	TotalUpdates     int64   `json:"total_updates"`
-	AverageSpeed     float64 `json:"average_speed"`
-	DistanceTraveled float64 `json:"distance_traveled"`
-	EventCount       int     `json:"event_count"`
+	TotalUpdates     int64     `json:"total_updates"`
+	DistanceTraveled float64   `json:"distance_traveled"`
+	EventCount       int       `json:"event_count"`
+	LastUpdated      time.Time `json:"last_updated"`
 }
