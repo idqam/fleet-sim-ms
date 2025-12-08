@@ -1,6 +1,8 @@
 package entities
 
 import (
+	"encoding/json"
+	"os"
 	"time"
 )
 
@@ -40,4 +42,12 @@ type Route struct {
 	StartNode     string   `json:"start_node"`
 	EndNode       string   `json:"end_node"`
 	TotalDistance float64  `json:"total_distance"`
+}
+
+func (g *MapGraph) ExportJSON(filename string) error {
+	data, err := json.MarshalIndent(g, "", "  ")
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(filename, data, 0644)
 }

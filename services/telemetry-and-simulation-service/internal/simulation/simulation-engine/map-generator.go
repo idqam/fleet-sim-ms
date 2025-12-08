@@ -282,3 +282,5 @@ func DelaunayGraph(N int, heightBound int, widthBound int) *entities.MapGraph {
 
 	return &entities.MapGraph{Nodes: nodes, Edges: edges}
 }
+
+

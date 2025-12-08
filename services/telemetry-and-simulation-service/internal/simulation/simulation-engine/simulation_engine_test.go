@@ -22,17 +22,17 @@ func TestSimulationEngine_Lifecycle(t *testing.T) {
 	v := &entities.Vehicle{ID: "v1"}
 	engine.AddVehicle(v)
 
-	engine.mutex.RLock()
+	engine.Mutex.RLock()
 	storedV, exists := engine.Vehicles["v1"]
-	engine.mutex.RUnlock()
+	engine.Mutex.RUnlock()
 	assert.True(t, exists)
 	assert.Equal(t, v, storedV)
 	assert.NotNil(t, v.StopChan)
 
 	engine.RemoveVehicle("v1")
-	engine.mutex.RLock()
+	engine.Mutex.RLock()
 	_, exists = engine.Vehicles["v1"]
-	engine.mutex.RUnlock()
+	engine.Mutex.RUnlock()
 	assert.False(t, exists)
 
 	engine.Stop()
@@ -77,11 +77,11 @@ func TestSimulationEngine_ConcurrentVehicles(t *testing.T) {
 
 	time.Sleep(50 * time.Millisecond)
 
-	engine.mutex.RLock()
+	engine.Mutex.RLock()
 	for _, v := range engine.Vehicles {
 		v.Mutex.Lock()
 		assert.True(t, v.State.ProgressOnEdge > 0 || v.State.Status == entities.VehicleStatusMoving)
 		v.Mutex.Unlock()
 	}
-	engine.mutex.RUnlock()
+	engine.Mutex.RUnlock()
 }

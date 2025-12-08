@@ -1,6 +1,7 @@
 package simulationengine
 
 import (
+	"fmt"
 	"sync"
 	"time"
 
@@ -11,9 +12,14 @@ type SimulationEngine struct {
 	Graph      *entities.MapGraph
 	Vehicles   map[string]*entities.Vehicle
 	UpdateRate time.Duration
-	mutex      sync.RWMutex
+	Mutex      sync.RWMutex
 	IsRunning  bool
 	wg         sync.WaitGroup
+}
+
+type TelemetryEmitterImpl struct {
+	// Will send to message queue later
+	Events chan entities.BasicVehiclePosEvent
 }
 
 func NewSimulationEngine(graph *entities.MapGraph, updateRate time.Duration) *SimulationEngine {
@@ -26,8 +32,8 @@ func NewSimulationEngine(graph *entities.MapGraph, updateRate time.Duration) *Si
 }
 
 func (s *SimulationEngine) Start() {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
 
 	if s.IsRunning {
 		return
@@ -40,8 +46,8 @@ func (s *SimulationEngine) Start() {
 }
 
 func (s *SimulationEngine) Stop() {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
 
 	if !s.IsRunning {
 		return
@@ -55,8 +61,8 @@ func (s *SimulationEngine) Stop() {
 }
 
 func (s *SimulationEngine) AddVehicle(vehicle *entities.Vehicle) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
 
 	if _, exists := s.Vehicles[vehicle.ID]; exists {
 		return
@@ -72,8 +78,8 @@ func (s *SimulationEngine) AddVehicle(vehicle *entities.Vehicle) {
 }
 
 func (s *SimulationEngine) RemoveVehicle(id string) {
-	s.mutex.Lock()
-	defer s.mutex.Unlock()
+	s.Mutex.Lock()
+	defer s.Mutex.Unlock()
 
 	vehicle, exists := s.Vehicles[id]
 	if !exists {
@@ -104,6 +110,7 @@ func (s *SimulationEngine) RunVehicleGoroutine(vehicle *entities.Vehicle) {
 		defer ticker.Stop()
 
 		lastUpdate := time.Now()
+		lastTelemetryEmit := time.Now()
 
 		for {
 			select {
@@ -115,6 +122,11 @@ func (s *SimulationEngine) RunVehicleGoroutine(vehicle *entities.Vehicle) {
 				vehicle.Mutex.Lock()
 				err := UpdateVehiclePosition(vehicle, s.Graph, dt)
 				vehicle.Mutex.Unlock()
+
+				if now.Sub(lastTelemetryEmit) >= 1*time.Second {
+					s.emitTelemetry(vehicle)
+					lastTelemetryEmit = now
+				}
 
 				if err != nil {
 				}
@@ -128,4 +140,36 @@ func (s *SimulationEngine) RunVehicleGoroutine(vehicle *entities.Vehicle) {
 			}
 		}
 	}()
+}
+
+func (t *TelemetryEmitterImpl) EmitPosition(event entities.BasicVehiclePosEvent) error {
+	select {
+	case t.Events <- event:
+		return nil
+	default:
+		return fmt.Errorf("telemetry channel full")
+	}
+}
+
+func (s *SimulationEngine) emitTelemetry(vehicle *entities.Vehicle) {
+	if vehicle.Route == nil || len(vehicle.Route.Edges) == 0 {
+		return
+	}
+
+	currentEdge := vehicle.State.CurrentEdge
+	if currentEdge == "" && vehicle.Route.CurrentEdgeIndex > 0 {
+		currentEdge = vehicle.Route.Edges[vehicle.Route.CurrentEdgeIndex-1]
+	}
+
+	event := entities.BasicVehiclePosEvent{
+		VehicleID:  vehicle.ID,
+		EdgeID:     currentEdge,
+		FromNodeID: vehicle.Route.CurrentNode,
+		Progress:   vehicle.State.ProgressOnEdge,
+		Timestamp:  time.Now(),
+	}
+
+	//  Later: send to Kafka/RabbitMQ/REDIS pub sub
+	fmt.Printf("[TELEMETRY] %s | Edge: %s | Progress: %.2f\n",
+		vehicle.ID, event.EdgeID, event.Progress)
 }
