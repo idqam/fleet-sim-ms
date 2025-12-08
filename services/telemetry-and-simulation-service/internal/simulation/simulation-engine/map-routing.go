@@ -31,8 +31,6 @@ func NewRoutingConfig(algo Algorithm) *RoutingConfig {
 	return &RoutingConfig{Algo: algo}
 }
 
-// these will be used to build the initial route
-// precomputation
 func Dijkstra(g *entities.MapGraph, start, end string) []*entities.Route {
 	dist := make(map[string]float64)
 	prev := make(map[string]string)
